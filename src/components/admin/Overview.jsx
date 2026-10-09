@@ -8,6 +8,15 @@ export default function Overview({ d, reload, toast, openForm, goOrders }) {
   const [shop, setShop] = useState(null);
   const s = shop || d.settings || { shop_name: 'Accessory Counter', contact: '', pickup_note: '' };
   const set = (k) => (e) => setShop({ ...s, [k]: e.target.value });
+  const [invF, setInvF] = useState(null);
+  const iv = invF || d.invoice || { business_details: '', footer_note: '' };
+  const setIv = (k) => (e) => setInvF({ ...iv, [k]: e.target.value });
+  async function saveInvoice(e) {
+    e.preventDefault();
+    const { error } = await supabase.from('invoice_settings').upsert({ id: 1, business_details: iv.business_details || '', footer_note: iv.footer_note || '' });
+    if (error) toast(error.message.includes('invoice_settings') ? 'Run invoice-patch.sql in Supabase first (see the setup notes).' : error.message);
+    else { toast('Invoice details saved'); setInvF(null); reload(); }
+  }
 
   async function saveShop(e) {
     e.preventDefault();
@@ -109,6 +118,14 @@ export default function Overview({ d, reload, toast, openForm, goOrders }) {
         <div className="fld"><label htmlFor="s-contact">Contact line shown on the shop (address, hours, phone)</label><input id="s-contact" value={s.contact} onChange={set('contact')} maxLength={160} /></div>
         <div className="fld"><label htmlFor="s-note">Message under the order button</label><input id="s-note" value={s.pickup_note} onChange={set('pickup_note')} maxLength={200} placeholder="We confirm by phone. Pay when you collect." /></div>
         <button className="btn" type="submit">Save shop details</button>
+      </form>
+
+      <div className="sechead"><h2>Invoice details</h2></div>
+      <p className="lead">Shown at the top of every invoice you create. Only you can see these settings, so you can safely include bank details.</p>
+      <form className="form" onSubmit={saveInvoice}>
+        <div className="fld"><label htmlFor="i-det">Business name, address, phone, VAT number</label><textarea id="i-det" rows={5} maxLength={600} value={iv.business_details} onChange={setIv('business_details')} placeholder={'Your business name\n12 High Street, Town, AB1 2CD\n07000 000000\nVAT no. (if you have one)'} /></div>
+        <div className="fld"><label htmlFor="i-foot">Note at the bottom (thank you, bank details, returns)</label><textarea id="i-foot" rows={3} maxLength={400} value={iv.footer_note} onChange={setIv('footer_note')} /></div>
+        <button className="btn" type="submit">Save invoice details</button>
       </form>
     </>
   );

@@ -62,7 +62,8 @@ export function ProductForm({ product, prefill, onClose, onSaved, reload, toast 
     name: p0.name || '', brand: p0.brand || prefill?.carry?.brand || '', category: p0.category || prefill?.carry?.category || '', model: p0.model || '',
     description: p0.description || '', price: p0.price ?? '', sku: p0.sku || '', barcode: p0.barcode || prefill?.barcode || '',
     cost: p0.cost ?? '', qty: prefill?.qty ?? '0', low_at: p0.low_at ?? 5, supplier: p0.supplier || prefill?.carry?.supplier || '', location: p0.location || prefill?.carry?.location || '',
-    published: p0.published ?? prefill?.carry?.published ?? true, photo_url: p0.photo_url || '',
+    published: p0.published ?? prefill?.carry?.published ?? true,
+    photos: (p0.photos && p0.photos.length ? p0.photos : (p0.photo_url ? [p0.photo_url] : [])),
   });
   const [busy, setBusy] = useState(false);
   const [scan, setScan] = useState(false);
@@ -83,19 +84,34 @@ export function ProductForm({ product, prefill, onClose, onSaved, reload, toast 
   const cats = [...new Set([...CATS, ...(f.category ? [f.category] : [])])];
   const price = num(f.price), cost = num(f.cost);
 
-  async function uploadPhoto(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    toast('Uploading photo');
-    const blob = await downscale(file, 900);
-    const path = `${crypto.randomUUID()}.jpg`;
-    const { error } = await supabase.storage.from('product-photos').upload(path, blob, { contentType: 'image/jpeg' });
+  const MAX_PHOTOS = 6;
+  const [uploading, setUploading] = useState(false);
+  async function uploadPhotos(e) {
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (error) { toast('Photo upload failed. Try a smaller picture.'); return; }
-    const { data } = supabase.storage.from('product-photos').getPublicUrl(path);
-    setF((s) => ({ ...s, photo_url: data.publicUrl }));
-    toast('Photo added. Save the product to keep it.');
+    if (!files.length) return;
+    const room = MAX_PHOTOS - f.photos.length;
+    if (room <= 0) { toast(`You can add up to ${MAX_PHOTOS} photos`); return; }
+    setUploading(true);
+    const added = [];
+    let failed = 0;
+    for (const file of files.slice(0, room)) {
+      try {
+        const blob = await downscale(file, 1000);
+        const path = `${crypto.randomUUID()}.jpg`;
+        const { error } = await supabase.storage.from('product-photos').upload(path, blob, { contentType: 'image/jpeg' });
+        if (error) { failed++; continue; }
+        added.push(supabase.storage.from('product-photos').getPublicUrl(path).data.publicUrl);
+      } catch { failed++; }
+    }
+    setUploading(false);
+    if (added.length) setF((s) => ({ ...s, photos: [...s.photos, ...added].slice(0, MAX_PHOTOS) }));
+    if (failed) toast(`${failed} photo${failed === 1 ? '' : 's'} could not be uploaded. Try a smaller picture.`);
+    else if (files.length > room) toast(`Added ${added.length}. The limit is ${MAX_PHOTOS} photos.`);
+    else toast(`${added.length} photo${added.length === 1 ? '' : 's'} added. Save the product to keep ${added.length === 1 ? 'it' : 'them'}.`);
   }
+  const dropPhoto = (i) => setF((s) => ({ ...s, photos: s.photos.filter((_, k) => k !== i) }));
+  const makeCover = (i) => setF((s) => ({ ...s, photos: [s.photos[i], ...s.photos.filter((_, k) => k !== i)] }));
 
   async function save(e) {
     e.preventDefault();
@@ -105,7 +121,7 @@ export function ProductForm({ product, prefill, onClose, onSaved, reload, toast 
     const row = {
       name: f.name.trim(), brand: f.brand.trim(), category: f.category.trim(), model: f.model.trim(),
       description: f.description.trim(), price: r2(price), sku: f.sku.trim() || null,
-      barcode: f.barcode.replace(/\s+/g, '') || null, photo_url: f.photo_url, published: f.published,
+      barcode: f.barcode.replace(/\s+/g, '') || null, photos: f.photos, photo_url: f.photos[0] || '', published: f.published,
       updated_at: new Date().toISOString(),
     };
     const priv = { cost: r2(cost), low_at: int(f.low_at), supplier: f.supplier.trim(), location: f.location.trim() };
@@ -157,12 +173,24 @@ export function ProductForm({ product, prefill, onClose, onSaved, reload, toast 
     <>
       <Sheet title={isNew ? 'Add product' : 'Edit product'} onClose={onClose}>
         <form className="form" onSubmit={save}>
-          <div className="shot">
-            <div className="thumb"><Thumb p={{ photo_url: f.photo_url, category: f.category }} /></div>
-            <div className="photo-actions">
-              <label className="btn" htmlFor="f-photo">{f.photo_url ? 'Change photo' : 'Add photo (optional)'}<input id="f-photo" type="file" accept="image/*" hidden onChange={uploadPhoto} /></label>
-              {f.photo_url && <button type="button" className="btn sm" onClick={() => setF((s) => ({ ...s, photo_url: '' }))}>Remove</button>}
+          <div className="gal">
+            <div className="gal-head"><span className="k">Photos (optional) &middot; {f.photos.length} of {MAX_PHOTOS}</span></div>
+            <div className="gal-grid">
+              {f.photos.map((u, i) => (
+                <div key={u} className="gal-item">
+                  <div className="thumb"><img src={u} alt={`Photo ${i + 1}`} /></div>
+                  {i === 0 ? <span className="cover">Cover</span> : <button type="button" className="gal-mk" onClick={() => makeCover(i)}>Make cover</button>}
+                  <button type="button" className="gal-x" aria-label={`Remove photo ${i + 1}`} onClick={() => dropPhoto(i)}>&times;</button>
+                </div>
+              ))}
+              {f.photos.length < MAX_PHOTOS && (
+                <label className="gal-add" htmlFor="f-photo">
+                  <span>{uploading ? 'Uploading' : f.photos.length ? '+ Add more' : '+ Add photos'}</span>
+                  <input id="f-photo" type="file" accept="image/*" multiple hidden disabled={uploading} onChange={uploadPhotos} />
+                </label>
+              )}
             </div>
+            <p className="sub">Pick several at once, or add them one by one. The cover photo shows first in the shop.</p>
           </div>
           <div className="fld"><label htmlFor="f-name">Product name</label><input id="f-name" required maxLength={90} value={f.name} onChange={set('name')} /></div>
           <div className="two">

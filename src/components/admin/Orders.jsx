@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FLOW, NEXT_LABEL, STATUS_LABEL, ago, gbp, when } from '@/lib/util';
 import { Pill, Progress } from '@/components/ui';
+import Invoice from './Invoice';
 
 export default function Orders({ d, reload, toast, focusId }) {
-  const [f, setF] = useState('active');
+  const [f, setF] = useState('all');
   const [open, setOpen] = useState(focusId || null);
   const [ask, setAsk] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [inv, setInv] = useState(null);
   useEffect(() => { if (focusId) { setOpen(focusId); setF('active'); } }, [focusId]);
   if (d.orders === null) return <div className="empty"><p>Loading.</p></div>;
 
@@ -27,7 +29,7 @@ export default function Orders({ d, reload, toast, focusId }) {
     <>
       <div className="sechead"><h2>Orders</h2></div>
       <div className="chips">
-        {[['active', 'Active'], ['done', 'Completed'], ['cancelled', 'Cancelled'], ['all', 'All']].map(([k, l]) => (
+        {[['all', 'All'], ['active', 'Active'], ['done', 'Completed'], ['cancelled', 'Cancelled']].map(([k, l]) => (
           <button key={k} type="button" className={`chip ${f === k ? 'on' : ''}`} onClick={() => setF(k)}>{l}</button>
         ))}
       </div>
@@ -42,7 +44,7 @@ export default function Orders({ d, reload, toast, focusId }) {
             <button type="button" className="ohead" onClick={() => setOpen(isOpen ? null : o.id)}>
               <div>
                 <div className="code">#{o.code}</div>
-                <div className="sub">{o.customer_name} &middot; {ago(o.created_at)} &middot; <span className="mono">{gbp(o.total)}</span></div>
+                <div className="sub">{o.customer_name}{(o.note || '').startsWith('Counter sale') ? ' · In shop' : ''} &middot; {ago(o.created_at)} &middot; <span className="mono">{gbp(o.total)}</span></div>
               </div>
               <Pill tone={o.status === 'cancelled' ? 'bad' : o.status === 'completed' ? 'ok' : o.status === 'new' ? 'acc' : 'warn'}>{STATUS_LABEL[o.status]}</Pill>
             </button>
@@ -64,6 +66,9 @@ export default function Orders({ d, reload, toast, focusId }) {
                   <dt>Placed</dt><dd>{when(o.created_at)}</dd>
                   <dt>Stock</dt><dd>{o.stock_taken ? 'Taken from stock' : 'Not taken yet'}</dd>
                 </dl>
+                {o.status !== 'cancelled' && (
+                  <div className="acts"><button type="button" className="btn" onClick={() => setInv(o)}>Invoice</button></div>
+                )}
                 {live(o) && (
                   <div className="acts">
                     {next && <button type="button" className="btn pri" disabled={busy} onClick={() => setStatus(o, next)}>{NEXT_LABEL[o.status]}</button>}
@@ -77,6 +82,7 @@ export default function Orders({ d, reload, toast, focusId }) {
           </div>
         );
       })}
+      {inv && <Invoice order={inv} shop={d.settings} inv={d.invoice} onClose={() => setInv(null)} toast={toast} />}
     </>
   );
 }

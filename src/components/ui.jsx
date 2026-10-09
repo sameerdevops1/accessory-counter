@@ -29,7 +29,8 @@ export function ScanIcon() {
 }
 
 export function Thumb({ p }) {
-  if (p?.photo_url) return <img src={p.photo_url} alt="" loading="lazy" />;
+  const src = p?.photos?.[0] || p?.photo_url;
+  if (src) return <img src={src} alt="" loading="lazy" />;
   return <div className="ph"><span>{p?.category || 'Accessory'}</span></div>;
 }
 

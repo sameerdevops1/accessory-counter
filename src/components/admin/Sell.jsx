@@ -146,10 +146,10 @@ export default function Sell({ d, reload, toast }) {
             <div className="form" style={{ marginTop: 12 }}>
               <div className="two">
                 <div className="fld"><label htmlFor="s-cname">Name</label><input id="s-cname" value={cust.name} onChange={(e) => setCust({ ...cust, name: e.target.value })} /></div>
-                <div className="fld"><label htmlFor="s-cphone">Mobile number</label><input id="s-cphone" type="tel" value={cust.phone} onChange={(e) => setCust({ ...cust, phone: e.target.value })} /></div>
+                <div className="fld"><label htmlFor="s-cphone">Mobile number (optional)</label><input id="s-cphone" type="tel" value={cust.phone} onChange={(e) => setCust({ ...cust, phone: e.target.value })} /></div>
               </div>
               <div className="fld"><label htmlFor="s-cnote">Note</label><input id="s-cnote" value={cust.note} onChange={(e) => setCust({ ...cust, note: e.target.value })} placeholder="Cash, card, discount given" /></div>
-              <p className="sub">Add a name and number to save them under Customers and keep their purchase history.</p>
+              <p className="sub">Both are optional. Add a name and a mobile number if you want the customer saved under Customers with their purchase history.</p>
             </div>
           </details>
           <div className="acts" style={{ marginTop: 12 }}>

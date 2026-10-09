@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ago, gbp, phoneKey, STATUS_LABEL } from '@/lib/util';
 import { Sheet } from '@/components/ui';
+import Invoice from './Invoice';
 
 export default function Customers({ d, reload, toast }) {
   const [q, setQ] = useState('');
@@ -37,12 +38,13 @@ export default function Customers({ d, reload, toast }) {
           ))}
         </div>
       )}
-      {edit !== undefined && <CustomerSheet c={edit} onClose={() => setEdit(undefined)} reload={reload} toast={toast} />}
+      {edit !== undefined && <CustomerSheet d={d} c={edit} onClose={() => setEdit(undefined)} reload={reload} toast={toast} />}
     </>
   );
 }
 
-function CustomerSheet({ c, onClose, reload, toast }) {
+function CustomerSheet({ d, c, onClose, reload, toast }) {
+  const [inv, setInv] = useState(null);
   const isNew = !c;
   const [f, setF] = useState({ name: c?.name || '', phone: c?.phone || '', email: c?.email || '', address: c?.address || '', notes: c?.notes || '' });
   const [busy, setBusy] = useState(false);
@@ -88,11 +90,15 @@ function CustomerSheet({ c, onClose, reload, toast }) {
           <h3>Recent orders</h3>
           <div className="lines">
             {st.orders.slice(0, 6).map((o) => (
-              <div key={o.id}><span>#{o.code} &middot; {ago(o.created_at)} &middot; {STATUS_LABEL[o.status]}</span><span className="mono">{gbp(o.total)}</span></div>
+              <div key={o.id}>
+                <span>#{o.code} &middot; {ago(o.created_at)} &middot; {STATUS_LABEL[o.status]}</span>
+                <span className="mono">{gbp(o.total)}{o.status !== 'cancelled' && <> &middot; <button type="button" className="linkbtn" onClick={() => setInv(o)}>Invoice</button></>}</span>
+              </div>
             ))}
           </div>
         </>
       )}
+      {inv && <Invoice order={inv} shop={d.settings} inv={d.invoice} onClose={() => setInv(null)} toast={toast} />}
     </Sheet>
   );
 }

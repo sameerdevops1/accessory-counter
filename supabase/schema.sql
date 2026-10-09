@@ -29,6 +29,16 @@ create table if not exists settings (
 );
 insert into settings default values on conflict do nothing;
 
+-- Private invoice details (address, VAT number, bank details). Admin only, never shown in the shop.
+create table if not exists invoice_settings (
+  id int primary key default 1 check (id = 1),
+  business_details text not null default '',
+  footer_note text not null default ''
+);
+alter table invoice_settings enable row level security;
+drop policy if exists "invoice settings admin only" on invoice_settings;
+create policy "invoice settings admin only" on invoice_settings for all using (is_admin()) with check (is_admin());
+
 -- Public product facts. Customers can read published rows only.
 create table if not exists products (
   id uuid primary key default gen_random_uuid(),
@@ -46,6 +56,10 @@ create table if not exists products (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Several photos per product (the first one is the cover). Safe to run again.
+alter table products add column if not exists photos text[] not null default '{}';
+update products set photos = array[photo_url] where photo_url <> '' and cardinality(photos) = 0;
 
 -- Private business facts. Admin only: cost, quantity, supplier, bin.
 create table if not exists product_private (
@@ -168,8 +182,12 @@ declare
   p products%rowtype;
   v_qty int;
 begin
-  if coalesce(trim(p_name), '') = '' or length(v_key) < 7 then
-    raise exception 'Name and a mobile number are required';
+  if coalesce(trim(p_name), '') = '' then
+    raise exception 'Please add your name';
+  end if;
+  -- The mobile number is optional, but if one is given it must look real.
+  if coalesce(trim(p_phone), '') <> '' and length(v_key) < 7 then
+    raise exception 'That mobile number looks too short. Leave it blank or check it';
   end if;
   if p_lines is null or jsonb_typeof(p_lines) <> 'array'
      or jsonb_array_length(p_lines) not between 1 and 50 then
@@ -182,16 +200,18 @@ begin
     exit when not exists (select 1 from orders where code = v_code);
   end loop;
 
-  insert into customers (name, phone, phone_key, email, address)
-  values (left(trim(p_name), 80), left(trim(p_phone), 30), v_key,
-          left(coalesce(trim(p_email), ''), 120), left(coalesce(trim(p_address), ''), 240))
-  on conflict (phone_key) do update
-    set email = coalesce(nullif(customers.email, ''), excluded.email),
-        address = coalesce(nullif(customers.address, ''), excluded.address)
-  returning id into v_cust;
+  if length(v_key) >= 7 then
+    insert into customers (name, phone, phone_key, email, address)
+    values (left(trim(p_name), 80), left(trim(p_phone), 30), v_key,
+            left(coalesce(trim(p_email), ''), 120), left(coalesce(trim(p_address), ''), 240))
+    on conflict (phone_key) do update
+      set email = coalesce(nullif(customers.email, ''), excluded.email),
+          address = coalesce(nullif(customers.address, ''), excluded.address)
+    returning id into v_cust;
+  end if;
 
   insert into orders (code, customer_id, customer_name, customer_phone, customer_email, customer_address, note)
-  values (v_code, v_cust, left(trim(p_name), 80), left(trim(p_phone), 30),
+  values (v_code, v_cust, left(trim(p_name), 80), left(coalesce(trim(p_phone), ''), 30),
           left(coalesce(trim(p_email), ''), 120), left(coalesce(trim(p_address), ''), 240),
           left(coalesce(trim(p_note), ''), 500))
   returning id into v_id;
@@ -225,7 +245,8 @@ language sql stable security definer set search_path = public as $$
               from order_lines ol where ol.order_id = o.id)
   )
   from orders o
-  where o.code = upper(trim(p_code)) and phone_key(o.customer_phone) = phone_key(p_phone)
+  where o.code = upper(trim(p_code)) and length(phone_key(p_phone)) >= 7
+    and phone_key(o.customer_phone) = phone_key(p_phone)
 $$;
 
 -- ---------- admin actions ----------
@@ -281,6 +302,9 @@ end $$;
 
 -- Counter sale: records a completed sale and takes stock off straight away.
 -- Used by the Sell screen (scan items, tap Complete sale). Customer details are optional.
+-- Remove any older copy with a different argument order (two copies make calls ambiguous).
+drop function if exists record_sale(text, text, text, jsonb);
+
 create or replace function record_sale(
   p_lines jsonb, p_name text default '', p_phone text default '', p_note text default ''
 ) returns text
@@ -364,65 +388,3 @@ create policy "photos admin update" on storage.objects for update to authenticat
 drop policy if exists "photos admin delete" on storage.objects;
 create policy "photos admin delete" on storage.objects for delete to authenticated
   using (bucket_id = 'product-photos' and public.is_admin());
-
--- ---------- counter sales (scan and sell in the shop) ----------
--- Saved as an order that is already completed, with stock taken off straight away.
-create or replace function record_sale(p_name text, p_phone text, p_note text, p_lines jsonb) returns text
-language plpgsql security definer set search_path = public as $$
-declare
-  v_key text := phone_key(p_phone);
-  v_id uuid;
-  v_code text;
-  v_cust uuid;
-  v_total numeric(10,2) := 0;
-  v_name text := coalesce(nullif(trim(p_name), ''), 'Walk-in customer');
-  l jsonb;
-  p products%rowtype;
-  v_qty int;
-begin
-  if not is_admin() then raise exception 'Not allowed'; end if;
-  if p_lines is null or jsonb_typeof(p_lines) <> 'array'
-     or jsonb_array_length(p_lines) not between 1 and 100 then
-    raise exception 'The sale is empty';
-  end if;
-
-  loop
-    select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + floor(random() * 31)::int, 1), '')
-      into v_code from generate_series(1, 4);
-    exit when not exists (select 1 from orders where code = v_code);
-  end loop;
-
-  if length(v_key) >= 7 then
-    insert into customers (name, phone, phone_key)
-    values (left(v_name, 80), left(trim(p_phone), 30), v_key)
-    on conflict (phone_key) do update set name = customers.name
-    returning id into v_cust;
-  end if;
-
-  insert into orders (code, status, customer_id, customer_name, customer_phone, note, stock_taken)
-  values (v_code, 'completed', v_cust, left(v_name, 80), left(coalesce(trim(p_phone), ''), 30),
-          left(coalesce(trim(p_note), 'Counter sale'), 500), true)
-  returning id into v_id;
-
-  for l in select jsonb_array_elements(p_lines) loop
-    v_qty := (l ->> 'qty')::int;
-    select * into p from products where id = (l ->> 'product_id')::uuid;
-    if not found or v_qty is null or v_qty < 1 then
-      raise exception 'An item in this sale is not in your catalogue';
-    end if;
-    update product_private set qty = qty - v_qty where product_id = p.id and qty >= v_qty;
-    if not found then
-      raise exception 'Not enough stock for %', p.name;
-    end if;
-    insert into order_lines (order_id, product_id, name, unit_price, qty)
-    values (v_id, p.id, p.name, p.price, v_qty);
-    insert into stock_moves (product_id, delta, reason) values (p.id, -v_qty, 'Sale ' || v_code);
-    v_total := v_total + p.price * v_qty;
-  end loop;
-
-  update orders set total = v_total where id = v_id;
-  return v_code;
-end $$;
-
-revoke all on function record_sale(text, text, text, jsonb) from public;
-grant execute on function record_sale(text, text, text, jsonb) to authenticated;

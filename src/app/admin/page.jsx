@@ -19,14 +19,15 @@ function norm(p) {
 function useAdminData() {
   const [d, setD] = useState({ products: null, orders: null, customers: null, settings: null, error: '' });
   const reload = useCallback(async () => {
-    const [p, o, c, s] = await Promise.all([
+    const [p, o, c, s, iv] = await Promise.all([
       supabase.from('products').select('*, product_private(*)').order('name'),
       supabase.from('orders').select('*, order_lines(*)').order('created_at', { ascending: false }).limit(500),
       supabase.from('customers').select('*').order('created_at', { ascending: false }),
       supabase.from('settings').select('*').eq('id', 1).maybeSingle(),
+      supabase.from('invoice_settings').select('*').eq('id', 1).maybeSingle(),
     ]);
     setD({
-      products: (p.data || []).map(norm), orders: o.data || [], customers: c.data || [], settings: s.data,
+      products: (p.data || []).map(norm), orders: o.data || [], customers: c.data || [], settings: s.data, invoice: iv.data || null,
       error: (p.error || o.error || c.error || s.error)?.message || '',
     });
   }, []);
@@ -93,7 +94,7 @@ function AdminApp() {
   const TABS = [['overview', 'Overview'], ['inventory', 'Inventory'], ['receive', 'Receive'], ['sell', 'Sell'], ['orders', 'Orders'], ['customers', 'Customers']];
 
   return (
-    <div className="wrap">
+    <div className="wrap fresh">
       <header className="top">
         <div className="brand"><PlugIcon /><span>{d.settings?.shop_name || 'Accessory Counter'}</span></div>
         <div className="top-r">

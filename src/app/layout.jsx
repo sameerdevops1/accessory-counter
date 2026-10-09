@@ -3,9 +3,11 @@ import './globals.css';
 export const metadata = {
   title: 'Accessory Counter',
   description: 'Phone cases, chargers, cables and more. Order online and collect from the shop.',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'Accessory Counter', statusBarStyle: 'default' },
 };
 
-export const viewport = { width: 'device-width', initialScale: 1 };
+export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#0b63f6' };
 
 export default function RootLayout({ children }) {
   return (

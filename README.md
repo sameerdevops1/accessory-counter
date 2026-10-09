@@ -55,7 +55,7 @@ Open http://localhost:3000 for the shop and http://localhost:3000/admin to sign 
 2. Add your products in either of two ways, on **Inventory**:
    - **Scan to add**: the camera opens, you scan the barcode, and a new product form opens with the barcode already filled in. Type the name and prices, then tap **Save and scan next** to carry on down the shelf. If you scan something you already have, that product opens instead.
    - **Add manually**: fill in the details by hand. **Save and add another** keeps the category and brand so a run of similar items is quick.
-3. A photo is optional. Tap **Add photo** to take or choose one, or **Remove** to clear it. A product with no photo shows its category in the shop. A product shown in the shop needs a selling price; untick "Show in the customer shop" to keep one private.
+3. Photos are optional. You can add up to 6 per product: pick several at once or add them one by one. The first is the cover shown on the shop card. Tap **Make cover** to change it, or the cross to remove one. Customers swipe through them on the product page. A product with no photo shows its category in the shop. A product shown in the shop needs a selling price; untick "Show in the customer shop" to keep one private.
 
 **When a delivery arrives**
 1. Open **Receive** and tap **Scan items in**. Scan every item as it comes out of the box. The same product scanned again adds one more. You hear a beep for each read, and a low tone with a message if the barcode is unknown.
@@ -64,6 +64,12 @@ Open http://localhost:3000 for the shop and http://localhost:3000/admin to sign 
 **Selling at the counter**
 1. Open **Sell** and tap **Scan items**. Scan what the customer is buying. The total builds as you go. It refuses to sell more than you have in stock.
 2. Tap **Complete sale**. Stock comes off at once and the sale is saved in Orders. Add a name and number first if you want the customer saved.
+
+**Invoices**
+1. Open **Overview > Invoice details** once and add your business name, address, phone and VAT number if you have one. Only you can see these settings. Add a thank-you or bank details line if you want.
+2. When a customer asks for an invoice, open **Orders**, tap the order, then tap **Invoice**.
+3. Tap **Print / Save PDF**. On the iPad choose Share, then Save to Files or send it by email or WhatsApp. Or tap **Share as text** to send the invoice as a message.
+4. A completed order shows "Paid in full". Any other order shows "Payment due on collection". If you are VAT registered, check with your accountant that this layout meets your needs.
 
 **Online orders**
 1. A new order shows on Overview and as a badge on **Orders**. Open it, check the details and tap **Confirm order**. Stock comes off at that point and the app will not confirm if you are short.
