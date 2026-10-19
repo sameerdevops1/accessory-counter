@@ -3,15 +3,37 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { supabase, configured } from '@/lib/supabase';
 import { gbp, CATS } from '@/lib/util';
-import { CartIcon, PlugIcon, Sheet, Stepper, Thumb, useToast } from '@/components/ui';
+import { CartIcon, SearchIcon, Sheet, Stepper, useToast } from '@/components/ui';
+import { StoreTop, StoreHeader, StoreFooter } from '@/components/store';
 
 const BLANK = { name: '', phone: '', email: '', address: '', note: '', website: '' };
+const NEW_DAYS = 14;
+const NEW_MAX = 4;
+
+function CatIcon({ name, size = 26 }) {
+  const n = (name || '').toLowerCase();
+  const P = (d) => <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
+  if (/charg|power|bank/.test(n)) return P(<path d="M13 3 5 13h6l-1 8 8-10h-6z" />);
+  if (/cable|usb|lead/.test(n)) return P(<><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0z" /><path d="M12 16v5" /></>);
+  if (/case|cover/.test(n)) return P(<><rect x="7" y="3" width="10" height="18" rx="2.5" /><path d="M11 18h2" /></>);
+  if (/protect|screen|glass/.test(n)) return P(<path d="M12 3 5 6v6c0 4 3 7 7 9 4-2 7-5 7-9V6z" />);
+  if (/audio|ear|head|speaker|sound/.test(n)) return P(<><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><rect x="3" y="14" width="4" height="6" rx="1.5" /><rect x="17" y="14" width="4" height="6" rx="1.5" /></>);
+  if (/car|holder|mount/.test(n)) return P(<><path d="M5 16l1.5-5h11L19 16" /><rect x="4" y="16" width="16" height="4" rx="1.5" /></>);
+  return P(<><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></>);
+}
+
+// Product photo, or a clean icon tile when the product has no photo yet.
+function StoreThumb({ p }) {
+  const src = p?.photos?.[0] || p?.photo_url;
+  if (src) return <img src={src} alt="" loading="lazy" />;
+  return <div className="st-ph" aria-hidden="true"><CatIcon name={p?.category} size={44} /></div>;
+}
 
 function Gallery({ p }) {
   const imgs = p.photos && p.photos.length ? p.photos : (p.photo_url ? [p.photo_url] : []);
   const [i, setI] = useState(0);
   const cur = Math.min(i, Math.max(imgs.length - 1, 0));
-  if (imgs.length === 0) return <div className="hero"><Thumb p={p} /></div>;
+  if (imgs.length === 0) return <div className="gallery"><div className="hero"><StoreThumb p={p} /></div></div>;
   return (
     <div className="gallery">
       <div className="hero"><img key={imgs[cur]} src={imgs[cur]} alt={`${p.name}, photo ${cur + 1} of ${imgs.length}`} /></div>
@@ -26,17 +48,12 @@ function Gallery({ p }) {
   );
 }
 
-function CatIcon({ name }) {
-  const n = (name || '').toLowerCase();
-  const P = (d) => <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
-  if (/charg|power|bank/.test(n)) return P(<path d="M13 3 5 13h6l-1 8 8-10h-6z" />);
-  if (/cable|usb|lead/.test(n)) return P(<><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0z" /><path d="M12 16v5" /></>);
-  if (/case|cover/.test(n)) return P(<><rect x="7" y="3" width="10" height="18" rx="2.5" /><path d="M11 18h2" /></>);
-  if (/protect|screen|glass/.test(n)) return P(<path d="M12 3 5 6v6c0 4 3 7 7 9 4-2 7-5 7-9V6z" />);
-  if (/audio|ear|head|speaker|sound/.test(n)) return P(<><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><rect x="3" y="14" width="4" height="6" rx="1.5" /><rect x="17" y="14" width="4" height="6" rx="1.5" /></>);
-  if (/car|holder|mount/.test(n)) return P(<><path d="M5 16l1.5-5h11L19 16" /><rect x="4" y="16" width="16" height="4" rx="1.5" /></>);
-  return P(<><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></>);
-}
+const TRUST = [
+  { t: 'Pay on collection', s: 'No card needed online', d: <><rect x="3" y="6" width="18" height="13" rx="2.5" /><path d="M3 10h18M16 14.5h2" /></> },
+  { t: 'Live stock', s: 'See what is available now', d: <path d="M3 12h4l2-6 4 12 2-6h6" /> },
+  { t: 'Track your order', s: 'With your code and number', d: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></> },
+  { t: 'Collect in shop', s: 'We confirm when it is ready', d: <path d="M4 9l1.5-5h13L20 9M4 9h16M4 9v10h16V9M10 19v-5h4v5" /> },
+];
 
 export default function Shop() {
   const [products, setProducts] = useState(null);
@@ -138,122 +155,144 @@ export default function Shop() {
   }, [products]);
   const shelfRef = useRef(null);
   const toShelf = () => shelfRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const pickCat = (c) => { setCat(c); toShelf(); };
+  // "New" flag: only the newest few products added in the last two weeks, so it stays meaningful.
+  const newIds = useMemo(() => new Set(
+    (products || [])
+      .filter((p) => p.in_stock && p.created_at && Date.now() - new Date(p.created_at).getTime() < NEW_DAYS * 864e5)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .slice(0, NEW_MAX)
+      .map((p) => p.id),
+  ), [products]);
 
   const open = sheet?.type === 'product' ? products?.find((p) => p.id === sheet.id) : null;
+  const shopCats = cats.filter((c) => c !== 'All');
 
   return (
-    <div className="wrap store">
-      <div className="st-top">
-        <span>Order online, pay when you collect</span>
-        <Link href="/track">Track order</Link>
-      </div>
-      <header className="top st-head">
-        <Link href="/" className="brand"><PlugIcon /><span>{shop.shop_name}</span></Link>
-        <input className="st-search" type="search" placeholder="Search cases, chargers, cables" value={q} onChange={(e) => { setQ(e.target.value); if (e.target.value) toShelf(); }} aria-label="Search products" autoComplete="off" />
-        <button type="button" className="iconbtn" onClick={() => setSheet({ type: 'cart' })} aria-label="Basket">
-          <CartIcon />{count > 0 && <span className="badge">{count}</span>}
+    <div className={`store${count > 0 && !sheet ? ' has-basket' : ''}`}>
+      <a className="skip" href="#shelf">Skip to products</a>
+      <StoreTop />
+      <StoreHeader name={shop.shop_name}>
+        <div className="st-searchbox">
+          <SearchIcon />
+          <input className="st-search" type="search" placeholder="Search cases, chargers, cables" value={q} onChange={(e) => { setQ(e.target.value); if (e.target.value) toShelf(); }} aria-label="Search products" autoComplete="off" />
+        </div>
+        <button type="button" className="iconbtn st-cart" onClick={() => setSheet({ type: 'cart' })} aria-label={`Basket, ${count} item${count === 1 ? '' : 's'}`}>
+          <CartIcon />
+          <span className="st-cart-label">{count > 0 ? gbp(total) : 'Basket'}</span>
+          {count > 0 && <span className="badge">{count}</span>}
         </button>
-      </header>
+      </StoreHeader>
       {products && products.length > 0 && (
         <nav className="st-nav" aria-label="Categories">
-          {cats.map((c) => (
-            <button key={c} type="button" className={cat === c ? 'on' : ''} onClick={() => { setCat(c); toShelf(); }}>{c}</button>
-          ))}
+          <div className="st-in">
+            {cats.map((c) => (
+              <button key={c} type="button" className={cat === c ? 'on' : ''} aria-current={cat === c ? 'true' : undefined} onClick={() => pickCat(c)}>{c}</button>
+            ))}
+          </div>
         </nav>
       )}
 
-      <section className="st-hero" aria-label="Welcome">
-        <div className="st-hero-text">
-          <span className="tag">Open to order</span>
-          <h1>Cases, chargers and cables, ready to collect</h1>
-          <p>Choose what you need, place your order online and pay when you pick it up.</p>
-          <div className="acts">
-            <button type="button" className="btn pri" onClick={toShelf}>Shop now</button>
-            <Link href="/track" className="btn">Track my order</Link>
-          </div>
-        </div>
-        <div className="st-hero-art" aria-hidden="true">
-          <svg className="cables" viewBox="0 0 600 260" preserveAspectRatio="xMidYMid slice" focusable="false">
-            <path className="cb c1" d="M-10 170 C 90 60, 170 250, 290 140 S 460 40, 620 120" />
-            <path className="cb c2" d="M-10 210 C 110 130, 210 230, 330 190 S 480 130, 620 200" />
-            <path className="cb c3" d="M140 -10 C 190 70, 100 120, 170 270" />
-          </svg>
-        </div>
-      </section>
-
-      {!configured && (
-        <div className="notice">This site is not connected to its database yet. Follow the setup steps in README.md, then reload.</div>
-      )}
-      {loadError && <div className="notice">{loadError}</div>}
-
-      {products === null ? (
-        <div className="empty"><p>Loading products.</p></div>
-      ) : products.length === 0 ? (
-        <div className="empty">
-          <h2>No products yet</h2>
-          <p>The shop has not published any products yet. Check back soon.</p>
-        </div>
-      ) : (
-        <>
-          <section className="st-cats" aria-label="Shop by category">
-            <h2>Shop by category</h2>
-            <div className="st-tiles">
-              {cats.filter((c) => c !== 'All').map((c) => (
-                <button key={c} type="button" className={`st-tile ${cat === c ? 'on' : ''}`} onClick={() => { setCat(cat === c ? 'All' : c); toShelf(); }}>
-                  <span className="ico"><CatIcon name={c} /></span>
-                  <b>{c}</b>
-                  <span>{counts[c] || 0} item{(counts[c] || 0) === 1 ? '' : 's'}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-          <div className="st-shelfhead" ref={shelfRef}>
-            <h2>{cat === 'All' ? 'All products' : cat}</h2>
-            <div className="st-tabs" role="tablist">
-              <button type="button" role="tab" aria-selected={tab === 'top'} className={tab === 'top' ? 'on' : ''} onClick={() => setTab('top')}>Top picks</button>
-              <button type="button" role="tab" aria-selected={tab === 'new'} className={tab === 'new' ? 'on' : ''} onClick={() => setTab('new')}>New arrivals</button>
+      <main className="st-in st-main">
+        <section className="st-hero" aria-label="Welcome">
+          <div className="st-hero-text">
+            <span className="tag"><i className="dot" />Open to order</span>
+            <h1>Cases, chargers and cables, ready to collect</h1>
+            <p>Choose what you need, place your order online and pay when you pick it up.</p>
+            <div className="acts">
+              <button type="button" className="btn pri" onClick={toShelf}>Shop now</button>
+              <Link href="/track" className="btn">Track my order</Link>
             </div>
           </div>
-          {shown.length === 0 ? (
-            <div className="empty"><p>Nothing matches that search.</p></div>
-          ) : (
-            <div className="grid">
-              {shown.map((p) => {
-                const out = !p.in_stock;
-                const n = cart[p.id] || 0;
-                return (
-                  <article key={p.id} className={`card ${out ? 'out' : ''}`} onClick={() => setSheet({ type: 'product', id: p.id })}>
-                    <div className="thumb"><Thumb p={p} /></div>
-                    <div className="cbody">
-                      <h3>{p.name}</h3>
-                      <p className="sub">{[p.brand, p.model].filter(Boolean).join(' · ')}</p>
-                      <p className={`stk ${out ? 'bad' : 'ok'}`}>{out ? 'Sold out' : '✓ In stock'}</p>
-                      <div className="cfoot" onClick={(e) => e.stopPropagation()}>
-                        <span className="price">{gbp(p.price)}</span>
-                        {!out && (n
-                          ? <Stepper n={n} onInc={() => add(p.id)} onDec={() => dec(p.id)} />
-                          : <button type="button" className="btn pri sm" onClick={() => add(p.id)}>Add</button>)}
+          <div className="st-hero-art" aria-hidden="true">
+            <svg className="cables" viewBox="0 0 600 260" preserveAspectRatio="xMidYMid slice" focusable="false">
+              <path className="cb c1" d="M-10 170 C 90 60, 170 250, 290 140 S 460 40, 620 120" />
+              <path className="cb c2" d="M-10 210 C 110 130, 210 230, 330 190 S 480 130, 620 200" />
+              <path className="cb c3" d="M140 -10 C 190 70, 100 120, 170 270" />
+            </svg>
+          </div>
+        </section>
+
+        <ul className="st-trust">
+          {TRUST.map((t) => (
+            <li key={t.t}>
+              <span className="ti"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{t.d}</svg></span>
+              <span><b>{t.t}</b><span className="s">{t.s}</span></span>
+            </li>
+          ))}
+        </ul>
+
+        {!configured && (
+          <div className="notice">This site is not connected to its database yet. Follow the setup steps in README.md, then reload.</div>
+        )}
+        {loadError && <div className="notice">{loadError}</div>}
+
+        {products === null ? (
+          <div className="empty"><p>Loading products.</p></div>
+        ) : products.length === 0 ? (
+          <div className="empty">
+            <h2>No products yet</h2>
+            <p>The shop has not published any products yet. Check back soon.</p>
+          </div>
+        ) : (
+          <>
+            <section className="st-cats" aria-label="Shop by category">
+              <div className="st-sechead"><h2>Shop by category</h2></div>
+              <div className="st-tiles">
+                {shopCats.map((c) => (
+                  <button key={c} type="button" className={`st-tile ${cat === c ? 'on' : ''}`} aria-pressed={cat === c} onClick={() => { setCat(cat === c ? 'All' : c); toShelf(); }}>
+                    <span className="ico"><CatIcon name={c} /></span>
+                    <b>{c}</b>
+                    <span>{counts[c] || 0} item{(counts[c] || 0) === 1 ? '' : 's'}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+            <div className="st-shelfhead" id="shelf" ref={shelfRef}>
+              <div>
+                <h2>{cat === 'All' ? 'All products' : cat}</h2>
+                <p className="sub">{shown.length} item{shown.length === 1 ? '' : 's'}{q.trim() ? ` for "${q.trim()}"` : ''}</p>
+              </div>
+              <div className="st-tabs" role="tablist">
+                <button type="button" role="tab" aria-selected={tab === 'top'} className={tab === 'top' ? 'on' : ''} onClick={() => setTab('top')}>Top picks</button>
+                <button type="button" role="tab" aria-selected={tab === 'new'} className={tab === 'new' ? 'on' : ''} onClick={() => setTab('new')}>New arrivals</button>
+              </div>
+            </div>
+            {shown.length === 0 ? (
+              <div className="empty"><p>Nothing matches that search.</p></div>
+            ) : (
+              <div className="grid">
+                {shown.map((p) => {
+                  const out = !p.in_stock;
+                  const n = cart[p.id] || 0;
+                  return (
+                    <article key={p.id} className={`card ${out ? 'out' : ''}`}>
+                      <div className="thumb">
+                        <StoreThumb p={p} />
+                        {out ? <span className="st-flag bad">Sold out</span> : newIds.has(p.id) ? <span className="st-flag">New</span> : null}
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
+                      <div className="cbody">
+                        <p className="st-brandline">{p.brand || p.category}</p>
+                        <h3><button type="button" className="copen" onClick={() => setSheet({ type: 'product', id: p.id })}>{p.name}</button></h3>
+                        {p.model && <p className="sub">Fits {p.model}</p>}
+                        <p className={`stk ${out ? 'bad' : 'ok'}`}>{out ? 'Sold out' : 'In stock'}</p>
+                        <div className="cfoot">
+                          <span className="price">{gbp(p.price)}</span>
+                          {!out && (n
+                            ? <Stepper n={n} onInc={() => add(p.id)} onDec={() => dec(p.id)} />
+                            : <button type="button" className="btn pri sm" aria-label={`Add ${p.name} to basket`} onClick={() => add(p.id)}>Add</button>)}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </main>
 
-      <ul className="st-trust">
-        <li><b>Pay on collection</b><span>No card needed online</span></li>
-        <li><b>Live stock</b><span>See what is available now</span></li>
-        <li><b>Track your order</b><span>With your code and number</span></li>
-        <li><b>Collect in shop</b><span>We confirm when it is ready</span></li>
-      </ul>
-      <footer className="st-foot">
-        <div><b>{shop.shop_name}</b>{shop.contact && <p>{shop.contact}</p>}</div>
-        <div><b>Shop</b>{cats.filter((c) => c !== 'All').slice(0, 5).map((c) => <button key={c} type="button" onClick={() => { setCat(c); toShelf(); }}>{c}</button>)}</div>
-        <div><b>Help</b><Link href="/track">Track my order</Link></div>
-      </footer>
+      <StoreFooter shop={shop} cats={shopCats} onCat={pickCat} />
 
       {count > 0 && !sheet && (
         <button type="button" className="basket" onClick={() => setSheet({ type: 'cart' })}>
@@ -263,21 +302,27 @@ export default function Shop() {
       )}
 
       {open && (
-        <Sheet title={open.name} onClose={() => setSheet(null)}>
-          <Gallery p={open} />
-          <div className="cfoot">
-            <span className="price lg">{gbp(open.price)}</span>
-            <span className={`stk ${open.in_stock ? 'ok' : 'bad'}`}>{open.in_stock ? '✓ In stock' : 'Sold out'}</span>
+        <Sheet title={open.name} wide onClose={() => setSheet(null)}>
+          <div className="pdp">
+            <Gallery p={open} />
+            <div className="pdp-info">
+              {open.brand && <p className="st-brandline">{open.brand}</p>}
+              <div className="cfoot">
+                <span className="price lg">{gbp(open.price)}</span>
+                <span className={`stk ${open.in_stock ? 'ok' : 'bad'}`}>{open.in_stock ? 'In stock' : 'Sold out'}</span>
+              </div>
+              <dl className="kv">
+                {open.brand && (<><dt>Brand</dt><dd>{open.brand}</dd></>)}
+                {open.model && (<><dt>Fits</dt><dd>{open.model}</dd></>)}
+                {open.category && (<><dt>Category</dt><dd>{open.category}</dd></>)}
+              </dl>
+              {open.description && <p className="pdp-desc">{open.description}</p>}
+              {open.in_stock && (cart[open.id]
+                ? <div className="acts"><Stepper n={cart[open.id]} onInc={() => add(open.id)} onDec={() => dec(open.id)} /><button type="button" className="btn pri" onClick={() => setSheet({ type: 'cart' })}>View basket</button></div>
+                : <button type="button" className="btn pri lg" onClick={() => add(open.id)}>Add to basket</button>)}
+              <p className="sub pdp-note">You pay in the shop when you collect. We confirm when your order is ready.</p>
+            </div>
           </div>
-          <dl className="kv">
-            {open.brand && (<><dt>Brand</dt><dd>{open.brand}</dd></>)}
-            {open.model && (<><dt>Fits</dt><dd>{open.model}</dd></>)}
-            {open.category && (<><dt>Category</dt><dd>{open.category}</dd></>)}
-          </dl>
-          {open.description && <p>{open.description}</p>}
-          {open.in_stock && (cart[open.id]
-            ? <div className="acts"><Stepper n={cart[open.id]} onInc={() => add(open.id)} onDec={() => dec(open.id)} /><button type="button" className="btn pri" onClick={() => setSheet({ type: 'cart' })}>View basket</button></div>
-            : <button type="button" className="btn pri" onClick={() => add(open.id)}>Add to basket</button>)}
         </Sheet>
       )}
 
@@ -290,7 +335,7 @@ export default function Shop() {
               <div className="list">
                 {lines.map((l) => (
                   <div key={l.id} className="item">
-                    <div className="thumb"><Thumb p={l.p} /></div>
+                    <div className="thumb"><StoreThumb p={l.p} /></div>
                     <div>
                       <div className="nm">{l.p?.name || 'Unavailable item'}</div>
                       <div className="meta">{l.ok ? `${gbp(l.p.price)} each` : 'No longer available'}</div>
@@ -303,7 +348,7 @@ export default function Shop() {
                   </div>
                 ))}
               </div>
-              <div className="cfoot"><span className="k">Total</span><span className="price lg">{gbp(total)}</span></div>
+              <div className="cfoot st-total"><span className="k">Total</span><span className="price lg">{gbp(total)}</span></div>
               <form className="form" onSubmit={place}>
                 <h3>Your details</h3>
                 <div className="two">
@@ -314,7 +359,7 @@ export default function Shop() {
                 <div className="fld"><label htmlFor="c-addr">Address (optional)</label><input id="c-addr" value={info.address} onChange={field('address')} autoComplete="street-address" /></div>
                 <div className="fld"><label htmlFor="c-note">Note to the shop (optional)</label><textarea id="c-note" value={info.note} onChange={field('note')} /></div>
                 <input className="hp" tabIndex={-1} autoComplete="off" aria-hidden="true" name="website" value={info.website} onChange={field('website')} />
-                <button className="btn pri" type="submit" disabled={busy || lines.some((l) => !l.ok)}>{busy ? 'Sending order' : 'Place order'}</button>
+                <button className="btn pri lg" type="submit" disabled={busy || lines.some((l) => !l.ok)}>{busy ? 'Sending order' : 'Place order'}</button>
                 {lines.some((l) => !l.ok) && <p className="sub">Remove unavailable items before ordering.</p>}
                 <p className="sub">{shop.pickup_note || 'You pay when you collect. Add a mobile number if you want the shop to confirm by phone and to track your order online.'}</p>
               </form>
@@ -325,7 +370,8 @@ export default function Shop() {
 
       {sheet?.type === 'done' && (
         <Sheet title="Order sent" onClose={() => setSheet(null)}>
-          <div className="empty">
+          <div className="empty st-done">
+            <span className="st-check" aria-hidden="true">&#10003;</span>
             <span className="price lg">#{sheet.code}</span>
             <p>The shop has your order and {info.phone.trim() ? `will confirm it on ${info.phone}. Keep this code. You can check progress any time with your code and mobile number.` : 'will have it ready for you. Keep this code and show it when you collect. Tracking online needs a mobile number.'}</p>
             <div className="acts">

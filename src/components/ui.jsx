@@ -58,7 +58,15 @@ export function Stepper({ n, onInc, onDec }) {
   );
 }
 
-export function Sheet({ title, onClose, children }) {
+export function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+export function Sheet({ title, onClose, children, wide = false }) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -73,7 +81,7 @@ export function Sheet({ title, onClose, children }) {
   return (
     <div className="sheet">
       <div className="scrim" onClick={onClose} />
-      <div className="panel" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`panel${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="sh-h">
           <h2>{title}</h2>
           <button className="x" type="button" onClick={onClose} aria-label="Close">&times;</button>
