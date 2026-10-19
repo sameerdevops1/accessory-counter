@@ -1,9 +1,12 @@
 'use client';
+import { useState } from 'react';
 import { gbp, when } from '@/lib/util';
 
 // A printable invoice for one order. Print / Save PDF uses the device's own print dialog,
 // which on an iPad offers Save to Files, Share and AirPrint.
+// Email opens the device's Mail app with the invoice already written, ready to send.
 export default function Invoice({ order: o, shop, inv, onClose, toast }) {
+  const [email, setEmail] = useState(o.customer_email || '');
   const lines = o.order_lines || [];
   const paid = o.status === 'completed';
   const number = `INV-${o.code}`;
@@ -37,6 +40,18 @@ export default function Invoice({ order: o, shop, inv, onClose, toast }) {
     } catch { /* share sheet closed */ }
   }
 
+  function sendEmail(e) {
+    e.preventDefault();
+    const to = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { toast("Type the customer's email address first"); return; }
+    const subject = `Invoice ${number} from ${shop?.shop_name || 'us'}`;
+    const body = `Hello ${o.customer_name},\n\nThank you for your order. Your invoice is below.\n\n${asText()}\n`;
+    // A real link click is the most reliable way to open Mail on iPad Safari.
+    const a = document.createElement('a');
+    a.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
   return (
     <div className="inv-overlay" role="dialog" aria-modal="true" aria-label={`Invoice ${number}`}>
       <div className="inv-bar">
@@ -46,6 +61,11 @@ export default function Invoice({ order: o, shop, inv, onClose, toast }) {
           <button type="button" className="btn pri" onClick={() => window.print()}>Print / Save PDF</button>
         </div>
       </div>
+      <form className="inv-mail" onSubmit={sendEmail} noValidate>
+        <label className="sr-only" htmlFor="inv-email">Customer email</label>
+        <input id="inv-email" type="email" inputMode="email" autoComplete="off" placeholder="Customer email address" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <button type="submit" className="btn">Email invoice</button>
+      </form>
       {!details && <p className="notice inv-hint">Add your business address and VAT number under Overview &gt; Invoice details so they appear here.</p>}
       <article className="inv-paper">
         <header className="inv-head">

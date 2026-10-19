@@ -98,7 +98,7 @@ function CustomerSheet({ d, c, onClose, reload, toast }) {
           </div>
         </>
       )}
-      {inv && <Invoice order={inv} shop={d.settings} inv={d.invoice} onClose={() => setInv(null)} toast={toast} />}
+      {inv && <Invoice order={{ ...inv, customer_email: inv.customer_email || c?.email || '' }} shop={d.settings} inv={d.invoice} onClose={() => setInv(null)} toast={toast} />}
     </Sheet>
   );
 }
