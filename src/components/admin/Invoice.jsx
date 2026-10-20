@@ -1,6 +1,32 @@
 'use client';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { gbp, when } from '@/lib/util';
+
+// Print layout. The invoice is placed straight under <body> (see createPortal below) so that, when
+// printing, everything else on the screen can be switched off with display:none. That way the invoice
+// starts at the top of page 1, a normal order fits on one page, a long one runs on to a second page
+// neatly, and no empty pages are printed after it. These rules also replace the older print rules
+// in globals.css (the !important marks make sure of that).
+const PRINT_CSS = `
+@media print{
+  @page{size:A4;margin:12mm 14mm}
+  html,body{height:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
+  body>*:not(.inv-overlay){display:none!important}
+  .inv-overlay{position:static!important;display:block!important;inset:auto!important;width:auto!important;height:auto!important;overflow:visible!important;background:#fff!important;padding:0!important;margin:0!important}
+  .inv-overlay,.inv-overlay *{visibility:visible!important}
+  .inv-bar,.inv-hint,.inv-mail{display:none!important}
+  .inv-paper{position:static!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;border-radius:0!important;font-size:12.5px;line-height:1.4}
+  .inv-head{padding-bottom:12px;break-inside:avoid;page-break-inside:avoid}
+  .inv-bill{margin:14px 0 8px;break-inside:avoid;page-break-inside:avoid}
+  .inv-table thead{display:table-header-group}
+  .inv-table tfoot{display:table-row-group}
+  .inv-table tr{break-inside:avoid;page-break-inside:avoid}
+  .inv-table th{padding:7px 6px}
+  .inv-table td{padding:6px}
+  .inv-table tfoot td{padding-top:10px}
+  .inv-status,.inv-foot{break-inside:avoid;page-break-inside:avoid}
+}`;
 
 // A printable invoice for one order. Print / Save PDF uses the device's own print dialog,
 // which on an iPad offers Save to Files, Share and AirPrint.
@@ -52,8 +78,10 @@ export default function Invoice({ order: o, shop, inv, onClose, toast }) {
     document.body.appendChild(a); a.click(); a.remove();
   }
 
-  return (
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div className="inv-overlay" role="dialog" aria-modal="true" aria-label={`Invoice ${number}`}>
+      <style>{PRINT_CSS}</style>
       <div className="inv-bar">
         <button type="button" className="btn" onClick={onClose}>Close</button>
         <div className="acts">
@@ -106,6 +134,7 @@ export default function Invoice({ order: o, shop, inv, onClose, toast }) {
         <p className={`inv-status ${paid ? 'paid' : ''}`}>{paid ? 'Paid in full. Thank you.' : 'Payment due on collection.'}</p>
         {foot && <p className="inv-foot">{foot}</p>}
       </article>
-    </div>
+    </div>,
+    document.body,
   );
 }
