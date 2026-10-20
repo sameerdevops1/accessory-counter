@@ -55,7 +55,8 @@ Open http://localhost:3000 for the shop and http://localhost:3000/admin to sign 
 2. Add your products in either of two ways, on **Inventory**:
    - **Scan to add**: the camera opens, you scan the barcode, and a new product form opens with the barcode already filled in. Type the name and prices, then tap **Save and scan next** to carry on down the shelf. If you scan something you already have, that product opens instead.
    - **Add manually**: fill in the details by hand. **Save and add another** keeps the category and brand so a run of similar items is quick.
-3. Photos are optional. You can add up to 6 per product: pick several at once or add them one by one. The first is the cover shown on the shop card. Tap **Make cover** to change it, or the cross to remove one. Customers swipe through them on the product page. A product with no photo shows its category in the shop. A product shown in the shop needs a selling price; untick "Show in the customer shop" to keep one private.
+3. Photos are optional. You can add up to 6 per product: pick several at once or add them one by one. The first is the cover shown on the shop card. Tap **Make cover** to change it, or the cross to remove one. Customers swipe through them on the product page, and the product page shows the whole photo (nothing is cropped there). A product with no photo shows its category in the shop. A product shown in the shop needs a selling price; untick "Show in the customer shop" to keep one private.
+4. To find things quickly, tap the sort icon on Inventory (under the search box). Choose price (low to high or high to low), most sold, stock, category (with a heading for each), newest first or name. It opens on price low to high and remembers your choice on that device. The **Category** box next to it shows one category only. Customers get the same sort icon above the products in the shop: price low to high (the default), price high to low, best selling, newest first or name. Sold-out items always sit at the end. "Best selling" appears in the shop after you run `supabase/best-sellers.sql` once in Supabase > SQL Editor (new installs already get it from `schema.sql`).
 
 **When a delivery arrives**
 1. Open **Receive** and tap **Scan items in**. Scan every item as it comes out of the box. The same product scanned again adds one more. You hear a beep for each read, and a low tone with a message if the barcode is unknown.
@@ -68,7 +69,8 @@ Open http://localhost:3000 for the shop and http://localhost:3000/admin to sign 
 **Invoices**
 1. Open **Overview > Invoice details** once and add your business name, address, phone and VAT number if you have one. Only you can see these settings. Add a thank-you or bank details line if you want.
 2. When a customer asks for an invoice, open **Orders**, tap the order, then tap **Invoice**.
-3. Tap **Print / Save PDF**. On the iPad choose Share, then Save to Files or send it by email or WhatsApp. Or tap **Share as text** to send the invoice as a message.
+3. To email it, check the customer's email address in the box under the buttons (it is filled in if they gave one) and tap **Email invoice**. Your iPad's Mail app opens with the invoice already written. Check it and tap Send.
+4. To send a PDF, tap **Print / Save PDF**. On the iPad choose Share, then Save to Files or send it by WhatsApp or as an email attachment. Or tap **Share as text** to send the invoice as a message.
 4. A completed order shows "Paid in full". Any other order shows "Payment due on collection". If you are VAT registered, check with your accountant that this layout meets your needs.
 
 **Online orders**

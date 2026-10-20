@@ -5,10 +5,30 @@ import { supabase, configured } from '@/lib/supabase';
 import { gbp, CATS } from '@/lib/util';
 import { CartIcon, SearchIcon, Sheet, Stepper, useToast } from '@/components/ui';
 import { StoreTop, StoreHeader, StoreFooter } from '@/components/store';
+import SortMenu from '@/components/SortMenu';
 
 const BLANK = { name: '', phone: '', email: '', address: '', note: '', website: '' };
 const NEW_DAYS = 14;
 const NEW_MAX = 4;
+const SORTS = [
+  ['low', 'Price: low to high'],
+  ['high', 'Price: high to low'],
+  ['best', 'Best selling'],
+  ['new', 'Newest first'],
+  ['az', 'Name: A to Z'],
+];
+// Sold-out items always go to the end, whatever the order.
+// rank: product id -> place in the best-sellers list (0 is the best seller).
+function byOrder(sort, rank) {
+  const price = (p) => Number(p.price) || 0;
+  const place = (p) => (rank.has(p.id) ? rank.get(p.id) : 1e9);
+  const name = (a, b) => a.name.localeCompare(b.name);
+  return (a, b) => (a.in_stock === false) - (b.in_stock === false)
+    || (sort === 'low' ? price(a) - price(b) : sort === 'high' ? price(b) - price(a)
+      : sort === 'best' ? place(a) - place(b)
+        : sort === 'new' ? String(b.created_at || '').localeCompare(String(a.created_at || '')) : 0)
+    || name(a, b);
+}
 
 function CatIcon({ name, size = 26 }) {
   const n = (name || '').toLowerCase();
@@ -62,7 +82,8 @@ export default function Shop() {
   const [info, setInfo] = useState(BLANK);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('All');
-  const [tab, setTab] = useState('top');
+  const [sort, setSort] = useState('low');
+  const [best, setBest] = useState(null); // product ids, best seller first; stays null until the database can tell us
   const [sheet, setSheet] = useState(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -77,15 +98,17 @@ export default function Shop() {
     hydrated.current = true;
     if (!configured) { setProducts([]); return; }
     (async () => {
-      const [p, s] = await Promise.all([
+      const [p, s, b] = await Promise.all([
         supabase.from('products')
           .select('id,name,brand,category,model,description,price,photo_url,photos,in_stock,created_at')
           .eq('published', true).order('name'),
         supabase.from('settings').select('*').eq('id', 1).maybeSingle(),
+        supabase.rpc('best_sellers'),
       ]);
       if (p.error) setLoadError('The shop could not load. Please try again in a moment.');
       setProducts(p.data || []);
       if (s.data) setShop(s.data);
+      if (!b.error && Array.isArray(b.data)) setBest(b.data);
     })();
   }, []);
 
@@ -140,13 +163,18 @@ export default function Shop() {
     return ['All', ...CATS.filter((c) => seen.has(c)), ...[...seen].filter((c) => !CATS.includes(c))];
   }, [products]);
 
+  const rank = useMemo(() => new Map((best || []).map((id, i) => [id, i])), [best]);
+  // "Best selling" only appears once the database function exists (see best-sellers.sql).
+  const sortOptions = best ? SORTS : SORTS.filter(([k]) => k !== 'best');
+  const sortNow = best || sort !== 'best' ? sort : 'low';
+
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
     return (products || [])
       .filter((p) => (cat === 'All' || p.category === cat)
         && (!s || [p.name, p.brand, p.model, p.category].join(' ').toLowerCase().includes(s)))
-      .sort((a, b) => (a.in_stock === false) - (b.in_stock === false) || (tab === 'new' ? String(b.created_at || '').localeCompare(String(a.created_at || '')) : a.name.localeCompare(b.name)));
-  }, [products, q, cat, tab]);
+      .sort(byOrder(sortNow, rank));
+  }, [products, q, cat, sortNow, rank]);
 
   const counts = useMemo(() => {
     const m = {};
@@ -253,9 +281,8 @@ export default function Shop() {
                 <h2>{cat === 'All' ? 'All products' : cat}</h2>
                 <p className="sub">{shown.length} item{shown.length === 1 ? '' : 's'}{q.trim() ? ` for "${q.trim()}"` : ''}</p>
               </div>
-              <div className="st-tabs" role="tablist">
-                <button type="button" role="tab" aria-selected={tab === 'top'} className={tab === 'top' ? 'on' : ''} onClick={() => setTab('top')}>Top picks</button>
-                <button type="button" role="tab" aria-selected={tab === 'new'} className={tab === 'new' ? 'on' : ''} onClick={() => setTab('new')}>New arrivals</button>
+              <div className="st-sort">
+                <SortMenu id="st-sort" value={sortNow} options={sortOptions} onChange={setSort} />
               </div>
             </div>
             {shown.length === 0 ? (

@@ -83,6 +83,11 @@ input[type=checkbox]{width:20px;height:20px;min-height:0}
 .item{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border:0;border-bottom:1px solid var(--line);cursor:pointer;width:100%;text-align:left;background:none;border-radius:0}
 .item.plain{grid-template-columns:minmax(0,1fr) auto;cursor:default}
 .list>.item:last-child{border-bottom:0}
+.list>.grp{padding:9px 12px;background:var(--raise);border-bottom:1px solid var(--line);font:600 11px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.list>.grp:first-child{border-radius:12px 12px 0 0}
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:6px}
+.tools select{background:var(--surface)}
+.tools-count{margin-bottom:8px}
 .item .thumb{width:48px;border-radius:8px;overflow:hidden}
 .item .nm{font-weight:600;overflow-wrap:anywhere}
 .item .meta{font:400 12px/1.4 var(--f-mono);color:var(--muted);overflow-wrap:anywhere}
@@ -315,9 +320,22 @@ input[type=checkbox]{width:20px;height:20px;min-height:0}
 
 /* product shelf */
 .st-shelfhead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-block:34px 16px;scroll-margin-top:130px}
-.st-tabs{display:inline-flex;background:#e8edf5;border-radius:999px;padding:4px}
-.st-tabs button{border:0;background:none;padding:9px 18px;border-radius:999px;font-weight:600;font-size:14px;color:var(--muted);transition:color .15s,background .15s}
-.st-tabs button.on{background:#fff;color:var(--accent);box-shadow:0 1px 3px rgba(14,23,38,.14)}
+.st-sort{max-width:100%}
+
+/* sort button + menu (shop and admin) */
+.sortm{position:relative;max-width:100%}
+.sortm-btn{display:inline-flex;align-items:center;gap:9px;max-width:100%;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font:600 14px/1.2 var(--f-body);color:var(--ink);text-align:left}
+.sortm-btn>svg{flex:none;color:var(--accent)}
+.sortm-cur{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sortm-btn .chev{display:grid;margin-left:auto;color:var(--muted);transition:transform .15s}
+.sortm-btn[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.sortm-btn:hover{border-color:var(--accent)}
+.sortm-menu{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:max(100%,240px);max-width:calc(100vw - 32px);padding:6px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 40px -16px rgba(14,23,38,.35),0 2px 6px rgba(14,23,38,.08)}
+.sortm-menu.r{left:auto;right:0}
+.sortm-menu button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:9px;background:none;font:500 15px/1.2 var(--f-body);color:var(--ink);text-align:left}
+.sortm-menu button:hover,.sortm-menu button:focus-visible{background:var(--raise);outline:none}
+.sortm-menu button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.store .sortm-btn{border-radius:999px;padding:0 16px}
 .store .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media (min-width:560px){.store .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}}
 @media (min-width:900px){.store .grid{grid-template-columns:repeat(4,minmax(0,1fr))}}

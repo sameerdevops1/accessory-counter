@@ -375,6 +375,20 @@ grant execute on function set_order_status(uuid, order_status) to authenticated;
 grant execute on function place_order(text, text, text, text, text, jsonb) to anon, authenticated;
 grant execute on function track_order(text, text) to anon, authenticated;
 
+-- Best selling order for the shop's sort menu. It only shares an order (best first), never how many were sold.
+create or replace function best_sellers() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select ol.product_id
+  from order_lines ol
+  join orders o on o.id = ol.order_id
+  join products p on p.id = ol.product_id
+  where o.status <> 'cancelled' and p.published
+  group by ol.product_id
+  order by sum(ol.qty) desc, min(p.name)
+  limit 200
+$$;
+grant execute on function best_sellers() to anon, authenticated;
+
 -- ---------- product photos ----------
 insert into storage.buckets (id, name, public) values ('product-photos', 'product-photos', true)
 on conflict (id) do nothing;

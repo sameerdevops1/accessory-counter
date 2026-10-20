@@ -1,21 +1,70 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { CATS, downscale, gbp, int, num, r2, when } from '@/lib/util';
 import { Pill, ScanIcon, Sheet, Thumb } from '@/components/ui';
 import Scanner from './Scanner';
+import SortMenu from '@/components/SortMenu';
+
+const SORTS = [
+  ['plow', 'Price: low to high'],
+  ['phigh', 'Price: high to low'],
+  ['best', 'Most sold'],
+  ['slow', 'Stock: lowest first'],
+  ['shigh', 'Stock: highest first'],
+  ['cat', 'Category'],
+  ['new', 'Newest first'],
+  ['name', 'Name: A to Z'],
+];
+const NO_CAT = 'Uncategorised';
+const catOf = (p) => (p.category || '').trim() || NO_CAT;
+
+// Remembers the chosen order on this device so the iPad keeps it next time.
+function savedSort() {
+  try {
+    const v = localStorage.getItem('ac.inv.sort');
+    return SORTS.some(([k]) => k === v) ? v : 'plow';
+  } catch { return 'plow'; }
+}
 
 export default function Inventory({ d, openForm, onScanAdd }) {
   const [q, setQ] = useState('');
   const [f, setF] = useState('all');
+  const [cat, setCat] = useState('all');
+  const [sort, setSort] = useState(savedSort);
   if (d.products === null) return <div className="empty"><p>Loading.</p></div>;
   const s = q.trim().toLowerCase();
+  const cats = [...new Set(d.products.map(catOf))]
+    .sort((a, b) => (a === NO_CAT) - (b === NO_CAT) || a.localeCompare(b));
+  const catNow = cats.includes(cat) ? cat : 'all';
+  const pick = (v) => {
+    setSort(v);
+    try { localStorage.setItem('ac.inv.sort', v); } catch { /* storage blocked */ }
+  };
+  const price = (p) => Number(p.price) || 0;
+  // Units sold per product, from the orders already loaded (the latest 500, cancelled ones left out).
+  const sold = {};
+  (d.orders || []).forEach((o) => {
+    if (o.status === 'cancelled') return;
+    (o.order_lines || []).forEach((l) => { if (l.product_id) sold[l.product_id] = (sold[l.product_id] || 0) + l.qty; });
+  });
+  const order = {
+    name: () => 0,
+    plow: (a, b) => price(a) - price(b),
+    phigh: (a, b) => price(b) - price(a),
+    best: (a, b) => (sold[b.id] || 0) - (sold[a.id] || 0),
+    slow: (a, b) => a.qty - b.qty,
+    shigh: (a, b) => b.qty - a.qty,
+    cat: (a, b) => (catOf(a) === NO_CAT) - (catOf(b) === NO_CAT) || catOf(a).localeCompare(catOf(b)),
+    new: (a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')),
+  }[sort] || (() => 0);
   const shown = d.products.filter((p) => {
     if (f === 'low' && !(p.qty > 0 && p.qty <= p.low_at)) return false;
     if (f === 'out' && p.qty > 0) return false;
     if (f === 'hidden' && p.published) return false;
+    if (catNow !== 'all' && catOf(p) !== catNow) return false;
     return !s || [p.name, p.brand, p.model, p.sku, p.barcode, p.supplier, p.category].join(' ').toLowerCase().includes(s);
-  });
+  }).sort((a, b) => order(a, b) || a.name.localeCompare(b.name));
   const margin = (p) => (Number(p.price) > 0 ? Math.round(((Number(p.price) - p.cost) / Number(p.price)) * 100) : 0);
   return (
     <>
@@ -32,22 +81,41 @@ export default function Inventory({ d, openForm, onScanAdd }) {
           <button key={k} type="button" className={`chip ${f === k ? 'on' : ''}`} onClick={() => setF(k)}>{l}</button>
         ))}
       </div>
+      <div className="tools">
+        <div className="fld">
+          <span className="k">Sort by</span>
+          <SortMenu id="inv-sort" value={sort} options={SORTS} onChange={pick} />
+        </div>
+        <div className="fld">
+          <label htmlFor="inv-cat">Category</label>
+          <select id="inv-cat" value={catNow} onChange={(e) => setCat(e.target.value)}>
+            <option value="all">All categories</option>
+            {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+      <p className="meta tools-count">{shown.length} product{shown.length === 1 ? '' : 's'}</p>
       {shown.length === 0 ? (
         <div className="empty"><p>{d.products.length ? 'No products match.' : 'No products yet. Tap Scan to add and scan a barcode, or Add manually.'}</p></div>
       ) : (
         <div className="list">
-          {shown.map((p) => (
-            <button key={p.id} type="button" className="item" onClick={() => openForm(p)}>
-              <div className="thumb"><Thumb p={p} /></div>
-              <div>
-                <div className="nm">{p.name} {!p.published && <Pill>Hidden</Pill>}</div>
-                <div className="meta">{[p.sku, p.barcode].filter(Boolean).join(' · ')}</div>
-              </div>
-              <div className="rt">
-                {p.qty <= 0 ? <Pill tone="bad">Out</Pill> : p.qty <= p.low_at ? <Pill tone="warn">Low &middot; {p.qty}</Pill> : <Pill tone="ok">{p.qty}</Pill>}
-                <span className="meta">{gbp(p.price)} &middot; {margin(p)}%</span>
-              </div>
-            </button>
+          {shown.map((p, i) => (
+            <Fragment key={p.id}>
+              {sort === 'cat' && (i === 0 || catOf(shown[i - 1]) !== catOf(p)) && (
+                <div className="grp">{catOf(p)} &middot; {shown.filter((x) => catOf(x) === catOf(p)).length}</div>
+              )}
+              <button type="button" className="item" onClick={() => openForm(p)}>
+                <div className="thumb"><Thumb p={p} /></div>
+                <div>
+                  <div className="nm">{p.name} {!p.published && <Pill>Hidden</Pill>}</div>
+                  <div className="meta">{[p.sku, p.barcode, sort === 'best' ? `${sold[p.id] || 0} sold` : ''].filter(Boolean).join(' · ')}</div>
+                </div>
+                <div className="rt">
+                  {p.qty <= 0 ? <Pill tone="bad">Out</Pill> : p.qty <= p.low_at ? <Pill tone="warn">Low &middot; {p.qty}</Pill> : <Pill tone="ok">{p.qty}</Pill>}
+                  <span className="meta">{gbp(p.price)} &middot; {margin(p)}%</span>
+                </div>
+              </button>
+            </Fragment>
           ))}
         </div>
       )}
